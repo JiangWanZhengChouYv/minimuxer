@@ -463,7 +463,8 @@ final internal class MinimuxerImpl: MinimuxerAPI {
 
     func fetchRunningProcessID(appId: String) async throws(MinimuxerError) -> UInt32 {
         try await runWithChecks("while finding App process", catchAll: MinimuxerError.createDebug) {
-            try await self.ensureDDIMounted()
+            // Listing processes does not need the developer disk image; mounting it here made a
+            // failed DDI download look like the app was not running.
             return try await self.gateway.fetchRunningProcessID(appId: appId)
         }
     }
