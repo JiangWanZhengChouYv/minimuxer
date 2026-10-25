@@ -275,7 +275,38 @@ extension BaseDeviceGateway {
 
         verboseLog("[\(logTag)] findProcessPID() target search terms: \(targetTerms)")
 
-        // Direct attach via RSP vAttachName
+        // Query the debug server's process list first. Unlike a plain attach, this returns the PID
+        // that StikJIT needs; vAttachName only gives us a thread id.
+        var queryCommands = [
+            "qfProcessInfo:all_users:1;",
+            "qfProcessInfo:all_users:1"
+        ]
+        for term in targetTerms {
+            let hex = Self.stringToHex(term)
+            queryCommands.append("qfProcessInfo:name:\(hex);")
+            queryCommands.append("qfProcessInfo:name_match:contains;name:\(hex);")
+            queryCommands.append("qfProcessInfo:name_match:starts_with;name:\(hex);")
+            queryCommands.append("qfProcessInfo:name_match:equals;name:\(hex);")
+            queryCommands.append("qfProcessInfo:name:\(hex)")
+        }
+
+        for queryCmd in queryCommands {
+            debugLog("[\(logTag)] findProcessPID() trying query: '\(queryCmd)'")
+            var currentResponse = try? sendCommand(queryCmd, [])
+
+            while let resp = currentResponse, let proc = RSPProcessInfo(rawResponse: resp) {
+                verboseLog("[\(logTag)] findProcessPID() found process: pid=\(proc.pid), name='\(proc.name)', exec='\(proc.executable)'")
+                for term in targetTerms {
+                    if proc.matches(term: term) {
+                        debugLog("[\(logTag)] findProcessPID() matched PID \(proc.pid) for '\(term)'")
+                        return proc.pid
+                    }
+                }
+                currentResponse = try? sendCommand("qsProcessInfo", [])
+            }
+        }
+
+        // Direct attach fallback by name
         for term in targetTerms {
             let hex = Self.stringToHex(term)
             let attachCmd = "vAttachName;\(hex)"
@@ -291,6 +322,14 @@ extension BaseDeviceGateway {
             debugLog("[\(logTag)] findProcessPID() direct attach succeeded: '\(attachResp)'")
             if let stopReply = RSPStopReply(rawPacket: attachResp), let json = stopReply.jsonPrettyPrinted {
                 debugLog("[\(logTag)] direct attach stop reply JSON:\n\(json)")
+            }
+            // The stop reply names a thread, not the process. Ask the attached debug server for
+            // its pid before letting go, as a fallback when the process-list queries are refused.
+            if let infoResp = try? sendCommand("qProcessInfo", []),
+               let info = RSPProcessInfo(rawResponse: infoResp), info.pid > 0 {
+                debugLog("[\(logTag)] findProcessPID() qProcessInfo returned PID \(info.pid)")
+                _ = try? sendCommand("D", [])
+                return info.pid
             }
             _ = try? sendCommand("D", [])
             return 0

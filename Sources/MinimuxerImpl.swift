@@ -461,6 +461,13 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         }
     }
 
+    func fetchRunningProcessID(appId: String) async throws(MinimuxerError) -> UInt32 {
+        try await runWithChecks("while finding App process", catchAll: MinimuxerError.createDebug) {
+            try await self.ensureDDIMounted()
+            return try await self.gateway.fetchRunningProcessID(appId: appId)
+        }
+    }
+
     func attachDebugger(pid: UInt32) async throws(MinimuxerError) {
         try await runWithChecks("while debugging process", catchAll: MinimuxerError.createDebug) {
             try await self.ensureDDIMounted()

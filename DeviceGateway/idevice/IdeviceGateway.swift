@@ -1267,6 +1267,39 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
         }
     }
 
+    private func syncFetchRunningProcessID(appId: String) throws -> UInt32 {
+        debugLog("[IdeviceGateway] fetchRunningProcessID() called, appId: \(appId), mode: .\(pairingFileType)")
+        try verifyInitialized()
+        guard pairingFileType == .rppairing else {
+            throw IdeviceGatewayError(.unsupportedOperation, reason: "Querying a running process id is only supported in .rppairing mode")
+        }
+
+        let (_, bundlePath, executableName) = try getAppPaths(appId: appId)
+        return try performWithService(
+            connect: debug_proxy_connect_rsd,
+            cleanup: debug_proxy_free,
+            serviceName: "debug proxy"
+        ) { client in
+            guard let pid = try self.findProcessPID(
+                appId: appId,
+                bundlePath: bundlePath.isEmpty ? nil : bundlePath,
+                executableName: executableName,
+                sendCommand: { name, args in
+                    try self.sendDebugProxyCommand(client: client, name: name, args: args)
+                }
+            ), pid > 0 else {
+                let targetName = executableName ?? appId
+                throw IdeviceGatewayError(
+                    .serviceError,
+                    reason: "App '\(targetName)' is not running. Please open the app and keep it in the background, then enable JIT."
+                )
+            }
+
+            debugLog("[IdeviceGateway] fetchRunningProcessID() found PID \(pid) for \(executableName ?? appId)")
+            return pid
+        }
+    }
+
     private func syncDebugProcess(pid: UInt32) throws {
         debugLog("[IdeviceGateway] debugProcess() called, pid: \(pid), mode: .\(pairingFileType)")
         try verifyInitialized()
@@ -2362,6 +2395,12 @@ extension IdeviceGateway {
     public func debugProcess(pid: UInt32) async throws {
         try await withFFIDispatch {
             try self.syncDebugProcess(pid: pid)
+        }
+    }
+
+    public func fetchRunningProcessID(appId: String) async throws -> UInt32 {
+        try await withFFIDispatch {
+            try self.syncFetchRunningProcessID(appId: appId)
         }
     }
 
