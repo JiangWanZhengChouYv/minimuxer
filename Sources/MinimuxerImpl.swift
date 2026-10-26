@@ -469,6 +469,12 @@ final internal class MinimuxerImpl: MinimuxerAPI {
         }
     }
 
+    func launchAppSuspended(appId: String) async throws(MinimuxerError) -> UInt32 {
+        try await runWithChecks("while launching App suspended", catchAll: MinimuxerError.launchSuccess) {
+            return try await self.gateway.launchAppSuspended(appId: appId)
+        }
+    }
+
     func attachDebugger(pid: UInt32) async throws(MinimuxerError) {
         try await runWithChecks("while debugging process", catchAll: MinimuxerError.createDebug) {
             try await self.ensureDDIMounted()
