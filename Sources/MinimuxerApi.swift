@@ -118,6 +118,7 @@ public protocol MinimuxerAPI: AnyObject {
     func debugApp(appId: String) async throws
     func fetchRunningProcessID(appId: String) async throws -> UInt32
     func launchAppSuspended(appId: String) async throws -> UInt32
+    func killProcess(pid: UInt32) async throws
     func attachDebugger(pid: UInt32) async throws
     func installProvisioningProfile(profile: Data) async throws
     func removeProvisioningProfile(id: String) async throws

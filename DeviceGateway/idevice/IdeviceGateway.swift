@@ -1343,6 +1343,38 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
         }
     }
 
+    private func syncKillProcess(pid: UInt32) throws {
+        debugLog("[IdeviceGateway] killProcess() called, pid: \(pid), mode: .\(pairingFileType)")
+        try verifyInitialized()
+        guard pairingFileType == .rppairing else {
+            throw IdeviceGatewayError(.unsupportedOperation, reason: "Killing a process is only supported in .rppairing mode")
+        }
+
+        try performWithService(
+            connect: remote_server_connect_rsd,
+            cleanup: remote_server_free,
+            serviceName: "remote server"
+        ) { server in
+            var control: OpaquePointer? = nil
+            if let newErr = process_control_new(server, &control) {
+                let msg = self.getErrorMessage(from: newErr)
+                defer { idevice_error_free(newErr) }
+                throw IdeviceGatewayError(.serviceError, reason: "Failed to open process control, error: (\(msg))")
+            }
+            guard let control else {
+                throw IdeviceGatewayError(.serviceError, reason: "Process control client was nil")
+            }
+            defer { process_control_free(control) }
+
+            if let killErr = process_control_kill_app(control, UInt64(pid)) {
+                let msg = self.getErrorMessage(from: killErr)
+                defer { idevice_error_free(killErr) }
+                throw IdeviceGatewayError(.serviceError, reason: "Failed to kill PID \(pid), error: (\(msg))")
+            }
+            debugLog("[IdeviceGateway] killProcess() killed PID \(pid)")
+        }
+    }
+
     private func syncDebugProcess(pid: UInt32) throws {
         debugLog("[IdeviceGateway] debugProcess() called, pid: \(pid), mode: .\(pairingFileType)")
         try verifyInitialized()
@@ -2450,6 +2482,12 @@ extension IdeviceGateway {
     public func launchAppSuspended(appId: String) async throws -> UInt32 {
         try await withFFIDispatch {
             try self.syncLaunchAppSuspended(appId: appId)
+        }
+    }
+
+    public func killProcess(pid: UInt32) async throws {
+        try await withFFIDispatch {
+            try self.syncKillProcess(pid: pid)
         }
     }
 

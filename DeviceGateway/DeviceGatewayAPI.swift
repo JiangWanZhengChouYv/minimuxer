@@ -58,6 +58,7 @@ public protocol DeviceGatewayAPI: AnyObject, Sendable {
     func debugProcess(pid: UInt32) async throws
     func fetchRunningProcessID(appId: String) async throws -> UInt32
     func launchAppSuspended(appId: String) async throws -> UInt32
+    func killProcess(pid: UInt32) async throws
 
     func performHeartbeat(interval: UInt64) async throws -> UInt64
 

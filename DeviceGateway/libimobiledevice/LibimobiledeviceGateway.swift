@@ -1478,6 +1478,10 @@ extension LibimobiledeviceGateway {
         throw LibimobiledeviceGatewayError(.unsupportedOperation, reason: "Launching an app suspended is only supported in .rppairing mode")
     }
 
+    public func killProcess(pid: UInt32) async throws {
+        throw LibimobiledeviceGatewayError(.unsupportedOperation, reason: "Killing a process is only supported in .rppairing mode")
+    }
+
     public func dumpProfiles(docsPath: String) async throws -> String {
         try await withFFIDispatch {
             try self.syncDumpProfiles(docsPath: docsPath)
